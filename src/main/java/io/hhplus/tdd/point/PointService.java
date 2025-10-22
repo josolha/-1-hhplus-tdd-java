@@ -26,34 +26,46 @@ public class PointService {
     }
 
     public UserPoint chargePoint(long id, long amount){
-        //1.현재 포인트 조회
-        UserPoint current = userPointTable.selectById(id);
-
-        //2.새로운 포인트 = 기존 포인트  + 충전 금액
-        long newPoint = current.point() + amount;
-
-        //3.History에 충전 내역 기록
-        pointHistoryTable.insert(id, amount, TransactionType.CHARGE, System.currentTimeMillis());
-
-        return userPointTable.insertOrUpdate(id,newPoint);
+        return updatePoint(id, amount, TransactionType.CHARGE);
     }
 
     public UserPoint usePoint(long id, long amount){
+        return updatePoint(id, amount, TransactionType.USE);
+    }
 
-        //1.현재 포인트 조회
+    private UserPoint updatePoint(long id, long amount, TransactionType type) {
+        // 1. 금액 검증
+        validateAmount(amount);
+
+        // 2. 현재 포인트 조회
         UserPoint current = userPointTable.selectById(id);
 
-        //2.잔액이 부족할 결우 포인트 사용은 실패
-        if(current.point()<amount){
+        // 3. 포인트 연산 가능 여부 검증 (USE일 때만 잔액 체크)
+        validatePoint(current.point(), amount, type);
+
+        // 4. 새로운 포인트 계산
+        long newPoint = (type == TransactionType.CHARGE)
+                ? current.point() + amount
+                : current.point() - amount;
+
+        // 5. History에 내역 기록
+        pointHistoryTable.insert(id, amount, type, System.currentTimeMillis());
+
+        // 6. 포인트 업데이트 및 반환
+        return userPointTable.insertOrUpdate(id, newPoint);
+    }
+
+    //목적 : 충전/사용 금액이 유효한지 검증
+    private void validateAmount(long amount){
+        if(amount <= 0){
+            throw new IllegalArgumentException("충전/사용 금액은 0보다 커야합니다");
+        }
+    }
+
+    //목적 : 잔고 부족시 에러 발생
+    private void validatePoint(long currentPoint, long amount, TransactionType type){
+        if (type == TransactionType.USE && currentPoint < amount){
             throw new IllegalArgumentException("잔고가 부족합니다");
         }
-
-        //3.새로운 포인트 = 기존 포인트 - 사용금액
-        long newPoint = current.point() - amount;
-
-        //4.History에 충전 내역 기록
-        pointHistoryTable.insert(id, amount, TransactionType.USE, System.currentTimeMillis());
-
-        return userPointTable.insertOrUpdate(id,newPoint);
     }
 }
