@@ -3,6 +3,8 @@ package io.hhplus.tdd.point;
 
 import static org.assertj.core.api.Assertions.*;
 
+import io.hhplus.tdd.database.PointHistoryTable;
+import io.hhplus.tdd.database.UserPointTable;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -13,10 +15,63 @@ import org.springframework.beans.factory.annotation.Autowired;
 public class PointServiceTest {
 
     private PointService pointService;
+    private UserPointTable userPointTable;
+    private PointHistoryTable pointHistoryTable;
+
+    // DB 상태 시각화 헬퍼 메서드
+    private void printUserPointTable(String title) {
+        System.out.println("\n========== " + title + " ==========");
+        System.out.println("┌─────────┬──────────┬─────────────────────┐");
+        System.out.println("│ User ID │  Point   │    Update Time      │");
+        System.out.println("├─────────┼──────────┼─────────────────────┤");
+
+        for (long userId = 1L; userId <= 3L; userId++) {
+            UserPoint up = userPointTable.selectById(userId);
+            System.out.printf("│   %-5d │  %-7d │  %s  │%n",
+                up.id(), up.point(),
+                new java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss")
+                    .format(new java.util.Date(up.updateMillis())));
+        }
+        System.out.println("└─────────┴──────────┴─────────────────────┘\n");
+    }
+
+    private void printPointHistoryTable(String title) {
+        System.out.println("\n========== " + title + " ==========");
+        System.out.println("┌────┬─────────┬─────────┬──────────┬─────────────────────┐");
+        System.out.println("│ ID │ User ID │  Amount │   Type   │    Update Time      │");
+        System.out.println("├────┼─────────┼─────────┼──────────┼─────────────────────┤");
+
+        for (long userId = 1L; userId <= 3L; userId++) {
+            List<PointHistory> histories = pointHistoryTable.selectAllByUserId(userId);
+            for (PointHistory h : histories) {
+                System.out.printf("│ %-2d │   %-5d │  %-6d │  %-6s  │  %s  │%n",
+                    h.id(), h.userId(), h.amount(), h.type(),
+                    new java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss")
+                        .format(new java.util.Date(h.updateMillis())));
+            }
+        }
+        System.out.println("└────┴─────────┴─────────┴──────────┴─────────────────────┘\n");
+    }
 
     @BeforeEach
     void setUp(){
-        pointService = new PointService();
+        pointHistoryTable = new PointHistoryTable();
+        userPointTable = new UserPointTable();
+        pointService = new PointService(userPointTable, pointHistoryTable);
+
+        // 더미 데이터 생성
+
+        // 사용자 1: 5000 포인트 보유
+        userPointTable.insertOrUpdate(1L, 5000L);
+        pointHistoryTable.insert(1L, 5000L, TransactionType.CHARGE, System.currentTimeMillis());
+
+        // 사용자 2: 10000 포인트 보유, 충전 및 사용 내역 있음
+        userPointTable.insertOrUpdate(2L, 10000L);
+        pointHistoryTable.insert(2L, 15000L, TransactionType.CHARGE, System.currentTimeMillis());
+        pointHistoryTable.insert(2L, 5000L, TransactionType.USE, System.currentTimeMillis());
+
+        // 사용자 3: 0 포인트 (빈 계정)
+        userPointTable.insertOrUpdate(3L, 0L);
     }
 
     @Test
@@ -30,6 +85,8 @@ public class PointServiceTest {
 
         //then
         assertThat(userPoint.id()).isEqualTo(userId);
+        printUserPointTable("UserPoint 테이블");
+        printPointHistoryTable("PointHistory 테이블");
 
     }
     @Test
@@ -51,12 +108,16 @@ public class PointServiceTest {
         //given
         long userId = 1L;
         long chargeAmount = 1000L;
+        UserPoint before = userPointTable.selectById(userId);
+        printUserPointTable("충전 전 UserPoint 테이블");
 
         //when
         UserPoint result = pointService.chargePoint(userId,chargeAmount);
-        
+        printUserPointTable("충전 후 UserPoint 테이블");
+        printPointHistoryTable("충전 후 PointHistory 테이블");
+
         //then
-        assertThat(result.point()).isEqualTo(chargeAmount);
+        assertThat(result.point()).isEqualTo(before.point()+chargeAmount);
     }
       
 
@@ -82,20 +143,23 @@ public class PointServiceTest {
     public void usePoint() throws Exception{
         //given
         long userId = 1L;
-        pointService.chargePoint(userId, 1000L);
+        UserPoint before = userPointTable.selectById(userId);
+        printUserPointTable("사용 전 UserPoint 테이블");
 
         //when
         UserPoint result = pointService.usePoint(userId, 500L);
+        printUserPointTable("사용 후 UserPoint 테이블");
+        printPointHistoryTable("사용 후 PointHistory 테이블");
 
         //then
-        assertThat(result.point()).isEqualTo(500L);
+        assertThat(result.point()).isEqualTo(before.point()-500L);
     }
 
     @Test
     @DisplayName("잔고가 부족할 경우 포인트 사용은 실패한다")
     public void usePoint_FailsWhenInsufficientBalance() throws Exception{
         //given
-        long userId = 1L;
+        long userId = 999L;
         pointService.chargePoint(userId, 500L);
 
         //when & then
