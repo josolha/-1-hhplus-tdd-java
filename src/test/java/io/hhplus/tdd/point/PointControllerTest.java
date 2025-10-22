@@ -90,10 +90,11 @@ class PointControllerTest {
                 .thenReturn(new UserPoint(userId, expectedPoint, System.currentTimeMillis()));
 
         // when & then
+        String requestBody = String.format("{\"amount\":%d}", chargeAmount);
         mockMvc.perform(
                         patch("/point/{id}/charge", userId)
                                 .contentType(MediaType.APPLICATION_JSON)
-                                .content(String.valueOf(chargeAmount))
+                                .content(requestBody)
                 )
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(userId))
@@ -113,10 +114,11 @@ class PointControllerTest {
                 .thenReturn(new UserPoint(userId, expectedPoint, System.currentTimeMillis()));
 
         // when & then
+        String requestBody = String.format("{\"amount\":%d}", useAmount);
         mockMvc.perform(
                         patch("/point/{id}/use", userId)
                                 .contentType(MediaType.APPLICATION_JSON)
-                                .content(String.valueOf(useAmount))
+                                .content(requestBody)
                 )
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(userId))

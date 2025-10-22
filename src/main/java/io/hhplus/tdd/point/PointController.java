@@ -43,9 +43,9 @@ public class PointController {
     @PatchMapping("{id}/charge")
     public UserPoint charge(
             @PathVariable long id,
-            @RequestBody long amount
+            @RequestBody PointRequest request
     ) {
-        return pointService.chargePoint(id, amount);
+        return pointService.chargePoint(id, request.amount());
     }
 
     /**
@@ -54,8 +54,8 @@ public class PointController {
     @PatchMapping("{id}/use")
     public UserPoint use(
             @PathVariable long id,
-            @RequestBody long amount
+            @RequestBody PointRequest request
     ) {
-        return pointService.usePoint(id, amount);
+        return pointService.usePoint(id, request.amount());
     }
 }
