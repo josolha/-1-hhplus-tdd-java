@@ -60,6 +60,9 @@ public class PointService {
         if(amount <= 0){
             throw new IllegalArgumentException("충전/사용 금액은 0보다 커야합니다");
         }
+        if(amount % 100 !=0){
+            throw new IllegalArgumentException("금액은 100원 단위로만 가능합니다");
+        }
     }
 
     //목적 : 잔고 부족시 에러 발생
