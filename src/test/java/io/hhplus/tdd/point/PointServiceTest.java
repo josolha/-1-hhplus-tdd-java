@@ -218,6 +218,94 @@ public class PointServiceTest {
                 assertThat(result.point()).isEqualTo(before.point() + chargeAmount);
             }
         }
+
+        @Nested
+        @DisplayName("최소/최대 금액 제한 검증")
+        class AmountLimitTest {
+
+            @Test
+            @DisplayName("충전 실패: 최소 금액 미만 (1,000원 미만)")
+            public void chargePoint_FailWhen_LessThanMinAmount() throws Exception {
+                //given
+                long userId = 1L;
+                long invalidAmount = 900L;
+
+                //when & then
+                assertThatThrownBy(() -> pointService.chargePoint(userId, invalidAmount))
+                        .isInstanceOf(IllegalArgumentException.class)
+                        .hasMessageContaining("충전 금액은 1,000원 이상이어야 합니다");
+            }
+
+            @Test
+            @DisplayName("충전 실패: 최대 금액 초과 (1,000,000원 초과)")
+            public void chargePoint_FailWhen_ExceedMaxAmount() throws Exception {
+                //given
+                long userId = 1L;
+                long invalidAmount = 1_000_100L;
+
+                //when & then
+                assertThatThrownBy(() -> pointService.chargePoint(userId, invalidAmount))
+                        .isInstanceOf(IllegalArgumentException.class)
+                        .hasMessageContaining("충전 금액은 1,000,000원 이하여야 합니다");
+            }
+
+            @Test
+            @DisplayName("사용 실패: 최소 금액 미만 (100원 미만)")
+            public void usePoint_FailWhen_LessThanMinAmount() throws Exception {
+                //given
+                long userId = 1L;
+                long invalidAmount = 0L;
+
+                //when & then
+                assertThatThrownBy(() -> pointService.usePoint(userId, invalidAmount))
+                        .isInstanceOf(IllegalArgumentException.class)
+                        .hasMessageContaining("충전/사용 금액은 0보다 커야합니다");
+            }
+
+            @Test
+            @DisplayName("사용 실패: 최대 금액 초과 (100,000원 초과)")
+            public void usePoint_FailWhen_ExceedMaxAmount() throws Exception {
+                //given
+                long userId = 1L;
+                userPointTable.insertOrUpdate(userId, 200_000L);
+                long invalidAmount = 100_100L;
+
+                //when & then
+                assertThatThrownBy(() -> pointService.usePoint(userId, invalidAmount))
+                        .isInstanceOf(IllegalArgumentException.class)
+                        .hasMessageContaining("사용 금액은 100,000원 이하여야 합니다");
+            }
+
+            @Test
+            @DisplayName("충전 성공: 최소 금액 (1,000원)")
+            public void chargePoint_SuccessWhen_MinAmount() throws Exception {
+                //given
+                long userId = 1L;
+                long chargeAmount = 1_000L;
+                UserPoint before = userPointTable.selectById(userId);
+
+                //when
+                UserPoint result = pointService.chargePoint(userId, chargeAmount);
+
+                //then
+                assertThat(result.point()).isEqualTo(before.point() + chargeAmount);
+            }
+
+            @Test
+            @DisplayName("충전 성공: 최대 금액 (1,000,000원)")
+            public void chargePoint_SuccessWhen_MaxAmount() throws Exception {
+                //given
+                long userId = 1L;
+                long chargeAmount = 1_000_000L;
+                UserPoint before = userPointTable.selectById(userId);
+
+                //when
+                UserPoint result = pointService.chargePoint(userId, chargeAmount);
+
+                //then
+                assertThat(result.point()).isEqualTo(before.point() + chargeAmount);
+            }
+        }
     }
 
 }
