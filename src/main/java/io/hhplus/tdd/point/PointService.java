@@ -47,7 +47,7 @@ public class PointService {
         UserPoint current = userPointTable.selectById(id);
 
         // 3. 포인트 연산 가능 여부 검증 (USE일 때만 잔액 체크)
-        validatePoint(current.point(), amount, type);
+        validateBalance(current.point(), amount, type);
 
         // 4. 새로운 포인트 계산
         long newPoint = (type == TransactionType.CHARGE)
@@ -68,33 +68,48 @@ public class PointService {
 
     //목적 : 충전/사용 금액이 유효한지 검증
     private void validateAmount(long amount, TransactionType type){
-        if(amount <= 0){
+        validateBasicAmount(amount);
+        validateAmountLimit(amount, type);
+    }
+
+    //목적 : 기본 금액 검증 (0보다 크고, 100원 단위)
+    private void validateBasicAmount(long amount) {
+        if (amount <= 0) {
             throw new IllegalArgumentException("충전/사용 금액은 0보다 커야합니다");
         }
-        if(amount % POINT_UNIT !=0){
+        if (amount % POINT_UNIT != 0) {
             throw new IllegalArgumentException("금액은 100원 단위로만 가능합니다");
         }
+    }
 
-        // 충전 금액 제한 검증
+    //목적 : 충전/사용 타입별 금액 제한 검증
+    private void validateAmountLimit(long amount, TransactionType type) {
         if (type == TransactionType.CHARGE) {
-            if (amount < MIN_CHARGE_AMOUNT) {
-                throw new IllegalArgumentException("충전 금액은 1,000원 이상이어야 합니다");
-            }
-            if (amount > MAX_CHARGE_AMOUNT) {
-                throw new IllegalArgumentException("충전 금액은 1,000,000원 이하여야 합니다");
-            }
+            validateChargeLimit(amount);
+        } else {
+            validateUseLimit(amount);
         }
+    }
 
-        // 사용 금액 제한 검증
-        if (type == TransactionType.USE) {
-            if (amount > MAX_USE_AMOUNT) {
-                throw new IllegalArgumentException("사용 금액은 100,000원 이하여야 합니다");
-            }
+    //목적 : 충전 금액 제한 검증 (1,000 ~ 1,000,000)
+    private void validateChargeLimit(long amount) {
+        if (amount < MIN_CHARGE_AMOUNT) {
+            throw new IllegalArgumentException("충전 금액은 1,000원 이상이어야 합니다");
+        }
+        if (amount > MAX_CHARGE_AMOUNT) {
+            throw new IllegalArgumentException("충전 금액은 1,000,000원 이하여야 합니다");
+        }
+    }
+
+    //목적 : 사용 금액 제한 검증 (최대 100,000)
+    private void validateUseLimit(long amount) {
+        if (amount > MAX_USE_AMOUNT) {
+            throw new IllegalArgumentException("사용 금액은 100,000원 이하여야 합니다");
         }
     }
 
     //목적 : 잔고 부족시 에러 발생
-    private void validatePoint(long currentPoint, long amount, TransactionType type){
+    private void validateBalance(long currentPoint, long amount, TransactionType type){
         if (type == TransactionType.USE && currentPoint < amount){
             throw new IllegalArgumentException("잔고가 부족합니다");
         }
