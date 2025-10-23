@@ -306,6 +306,42 @@ public class PointServiceTest {
                 assertThat(result.point()).isEqualTo(before.point() + chargeAmount);
             }
         }
+
+        @Nested
+        @DisplayName("최대 보유 포인트 제한 검증")
+        class MaxBalanceTest {
+
+            @Test
+            @DisplayName("충전 실패: 충전 후 잔액이 최대 한도(10,000,000원) 초과")
+            public void chargePoint_FailWhen_ExceedMaxBalance() throws Exception {
+                //given
+                long userId = 1L;
+                userPointTable.insertOrUpdate(userId, 9_500_000L);
+                long chargeAmount = 600_000L; // 충전 후 10,100,000원이 되어 한도 초과
+
+                //when & then
+                assertThatThrownBy(() -> pointService.chargePoint(userId, chargeAmount))
+                        .isInstanceOf(IllegalArgumentException.class)
+                        .hasMessageContaining("최대 보유 가능 포인트는 10,000,000원입니다");
+            }
+
+            @Test
+            @DisplayName("충전 성공: 충전 후 잔액이 최대 한도(10,000,000원)와 같음")
+            public void chargePoint_SuccessWhen_BalanceEqualsMaxBalance() throws Exception {
+                //given
+                long userId = 1L;
+                userPointTable.insertOrUpdate(userId, 9_000_000L);
+                long chargeAmount = 1_000_000L; // 충전 후 정확히 10,000,000원
+                UserPoint before = userPointTable.selectById(userId);
+
+                //when
+                UserPoint result = pointService.chargePoint(userId, chargeAmount);
+
+                //then
+                assertThat(result.point()).isEqualTo(before.point() + chargeAmount);
+                assertThat(result.point()).isEqualTo(10_000_000L);
+            }
+        }
     }
 
 }
