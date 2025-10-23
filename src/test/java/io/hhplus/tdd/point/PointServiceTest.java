@@ -8,6 +8,7 @@ import io.hhplus.tdd.database.UserPointTable;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 
@@ -166,6 +167,57 @@ public class PointServiceTest {
         assertThatThrownBy(() -> pointService.usePoint(userId, 1000L))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("잔고가 부족합니다");
+    }
+
+    @Nested
+    @DisplayName("추가 비즈니스 정책 검증")
+    class AdditionalPolicyTest {
+
+        @Nested
+        @DisplayName("100원 단위 검증")
+        class MultipleOf100Test {
+
+            @Test
+            @DisplayName("충전 실패: 100원 단위가 아닌 금액")
+            public void chargePoint_FailWhen_NotMultipleOf100() throws Exception {
+                //given
+                long userId = 1L;
+                long invalidAmount = 1234L;
+
+                //when&then
+                assertThatThrownBy(() -> pointService.chargePoint(userId, invalidAmount))
+                        .isInstanceOf(IllegalArgumentException.class)
+                        .hasMessageContaining("금액은 100원 단위로만 가능합니다");
+            }
+
+            @Test
+            @DisplayName("사용 실패: 100원 단위가 아닌 금액")
+            public void usePoint_FailWhen_NotMulitpleOf100() throws Exception {
+                //given
+                long userId = 1L;
+                long invalidAmount = 999L;
+
+                //when & then
+                assertThatThrownBy(() -> pointService.usePoint(userId, invalidAmount))
+                        .isInstanceOf(IllegalArgumentException.class)
+                        .hasMessageContaining("금액은 100원 단위로만 가능합니다");
+            }
+
+            @Test
+            @DisplayName("충전 성공: 100원 단위 금액")
+            public void charPoint_SuccessWhen_MultipleOf100() throws Exception {
+                //given
+                long userId = 1L;
+                long chargeAmount = 1100L;
+                UserPoint before = userPointTable.selectById(userId);
+
+                //when
+                UserPoint result = pointService.chargePoint(userId, chargeAmount);
+
+                //then
+                assertThat(result.point()).isEqualTo(before.point() + chargeAmount);
+            }
+        }
     }
 
 }
