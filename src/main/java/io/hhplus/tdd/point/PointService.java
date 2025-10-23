@@ -15,6 +15,7 @@ public class PointService {
     private static final long MIN_CHARGE_AMOUNT = 1_000L;
     private static final long MAX_CHARGE_AMOUNT = 1_000_000L;
     private static final long MAX_USE_AMOUNT = 100_000L;
+    private static final long MAX_BALANCE = 10_000_000L;
 
     public PointService(UserPointTable userPointTable, PointHistoryTable pointHistoryTable) {
         this.userPointTable = userPointTable;
@@ -53,10 +54,15 @@ public class PointService {
                 ? current.point() + amount
                 : current.point() - amount;
 
-        // 5. History에 내역 기록
+        // 5. 최대 잔액 검증 (CHARGE일 때만)
+        if (type == TransactionType.CHARGE) {
+            validateMaxBalance(newPoint);
+        }
+
+        // 6. History에 내역 기록
         pointHistoryTable.insert(id, amount, type, System.currentTimeMillis());
 
-        // 6. 포인트 업데이트 및 반환
+        // 7. 포인트 업데이트 및 반환
         return userPointTable.insertOrUpdate(id, newPoint);
     }
 
@@ -91,6 +97,13 @@ public class PointService {
     private void validatePoint(long currentPoint, long amount, TransactionType type){
         if (type == TransactionType.USE && currentPoint < amount){
             throw new IllegalArgumentException("잔고가 부족합니다");
+        }
+    }
+
+    //목적 : 최대 보유 포인트 제한 검증
+    private void validateMaxBalance(long newPoint) {
+        if (newPoint > MAX_BALANCE) {
+            throw new IllegalArgumentException("최대 보유 가능 포인트는 10,000,000원입니다");
         }
     }
 }
