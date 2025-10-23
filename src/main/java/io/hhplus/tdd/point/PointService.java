@@ -12,6 +12,9 @@ public class PointService {
     private final PointHistoryTable pointHistoryTable;
 
     private static final long POINT_UNIT = 100L;
+    private static final long MIN_CHARGE_AMOUNT = 1_000L;
+    private static final long MAX_CHARGE_AMOUNT = 1_000_000L;
+    private static final long MAX_USE_AMOUNT = 100_000L;
 
     public PointService(UserPointTable userPointTable, PointHistoryTable pointHistoryTable) {
         this.userPointTable = userPointTable;
@@ -37,7 +40,7 @@ public class PointService {
 
     private UserPoint updatePoint(long id, long amount, TransactionType type) {
         // 1. 금액 검증
-        validateAmount(amount);
+        validateAmount(amount, type);
 
         // 2. 현재 포인트 조회
         UserPoint current = userPointTable.selectById(id);
@@ -58,12 +61,29 @@ public class PointService {
     }
 
     //목적 : 충전/사용 금액이 유효한지 검증
-    private void validateAmount(long amount){
+    private void validateAmount(long amount, TransactionType type){
         if(amount <= 0){
             throw new IllegalArgumentException("충전/사용 금액은 0보다 커야합니다");
         }
         if(amount % POINT_UNIT !=0){
             throw new IllegalArgumentException("금액은 100원 단위로만 가능합니다");
+        }
+
+        // 충전 금액 제한 검증
+        if (type == TransactionType.CHARGE) {
+            if (amount < MIN_CHARGE_AMOUNT) {
+                throw new IllegalArgumentException("충전 금액은 1,000원 이상이어야 합니다");
+            }
+            if (amount > MAX_CHARGE_AMOUNT) {
+                throw new IllegalArgumentException("충전 금액은 1,000,000원 이하여야 합니다");
+            }
+        }
+
+        // 사용 금액 제한 검증
+        if (type == TransactionType.USE) {
+            if (amount > MAX_USE_AMOUNT) {
+                throw new IllegalArgumentException("사용 금액은 100,000원 이하여야 합니다");
+            }
         }
     }
 
