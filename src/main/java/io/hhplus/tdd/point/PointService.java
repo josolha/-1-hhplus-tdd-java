@@ -23,19 +23,19 @@ public class PointService {
     }
 
 
-    public UserPoint getUserPoint(long userId) {
+    public synchronized UserPoint getUserPoint(long userId) {
         return userPointTable.selectById(userId);
     }
 
-    public List<PointHistory> getUserPointHistory(long userId){
+    public synchronized List<PointHistory> getUserPointHistory(long userId){
         return pointHistoryTable.selectAllByUserId(userId);
     }
 
-    public UserPoint chargePoint(long id, long amount){
+    public synchronized UserPoint chargePoint(long id, long amount){
         return updatePoint(id, amount, TransactionType.CHARGE);
     }
 
-    public UserPoint usePoint(long id, long amount){
+    public synchronized UserPoint usePoint(long id, long amount){
         return updatePoint(id, amount, TransactionType.USE);
     }
 

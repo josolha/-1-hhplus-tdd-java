@@ -161,10 +161,10 @@ public class PointServiceTest {
     public void usePoint_FailsWhenInsufficientBalance() throws Exception{
         //given
         long userId = 999L;
-        pointService.chargePoint(userId, 500L);
+        pointService.chargePoint(userId, 1000L);
 
         //when & then
-        assertThatThrownBy(() -> pointService.usePoint(userId, 1000L))
+        assertThatThrownBy(() -> pointService.usePoint(userId, 2000L))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("잔고가 부족합니다");
     }
