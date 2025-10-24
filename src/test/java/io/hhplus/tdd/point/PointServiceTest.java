@@ -170,6 +170,170 @@ public class PointServiceTest {
     }
 
     @Nested
+    @DisplayName("동시성 문제 테스트")
+    class ConcurrencyTest {
+
+        @Test
+        @DisplayName("동시에 같은 사용자가 포인트 충전 시 모든 충전이 반영되어야 한다")
+        public void concurrentCharge_ShouldReflectAllCharges() throws Exception {
+            //given
+            long userId = 1L;
+            long chargeAmount = 1000L;
+            int threadCount = 10;
+
+            UserPoint before = userPointTable.selectById(userId);
+            long expectedPoint = before.point() + (chargeAmount * threadCount);
+
+            System.out.println("\n=== 동시성 테스트: 동시 충전 ===");
+            System.out.println("초기 포인트: " + before.point());
+            System.out.println("스레드 수: " + threadCount);
+            System.out.println("각 충전 금액: " + chargeAmount);
+            System.out.println("예상 최종 포인트: " + expectedPoint);
+
+            //when
+            Thread[] threads = new Thread[threadCount];
+            for (int i = 0; i < threadCount; i++) {
+                threads[i] = new Thread(() -> {
+                    pointService.chargePoint(userId, chargeAmount);
+                });
+                threads[i].start();
+            }
+
+            // 모든 스레드가 끝날 때까지 대기
+            for (Thread thread : threads) {
+                thread.join();
+            }
+
+            //then
+            UserPoint after = userPointTable.selectById(userId);
+            List<PointHistory> histories = pointHistoryTable.selectAllByUserId(userId);
+
+            System.out.println("실제 최종 포인트: " + after.point());
+            System.out.println("히스토리 개수: " + histories.size());
+            System.out.println("차이: " + (expectedPoint - after.point()) + " 포인트 손실\n");
+
+            // 동시성 문제가 있다면 이 assertion은 실패할 것입니다
+            assertThat(after.point()).isEqualTo(expectedPoint);
+        }
+
+        @Test
+        @DisplayName("동시에 같은 사용자가 포인트 사용 시 잔액이 음수가 되면 안된다")
+        public void concurrentUse_ShouldNotResultInNegativeBalance() throws Exception {
+            //given
+            long userId = 1L;
+            userPointTable.insertOrUpdate(userId, 10000L);
+            long useAmount = 2000L;
+            int threadCount = 10; // 총 20000원 사용 시도 (잔액은 10000원)
+
+            System.out.println("\n=== 동시성 테스트: 동시 사용 (잔액 부족) ===");
+            System.out.println("초기 포인트: 10000");
+            System.out.println("스레드 수: " + threadCount);
+            System.out.println("각 사용 금액: " + useAmount);
+            System.out.println("총 사용 시도: " + (useAmount * threadCount));
+
+            //when
+            java.util.concurrent.atomic.AtomicInteger successCount = new java.util.concurrent.atomic.AtomicInteger(0);
+            java.util.concurrent.atomic.AtomicInteger failCount = new java.util.concurrent.atomic.AtomicInteger(0);
+
+            Thread[] threads = new Thread[threadCount];
+            for (int i = 0; i < threadCount; i++) {
+                threads[i] = new Thread(() -> {
+                    try {
+                        pointService.usePoint(userId, useAmount);
+                        successCount.incrementAndGet();
+                    } catch (Exception e) {
+                        failCount.incrementAndGet();
+                    }
+                });
+                threads[i].start();
+            }
+
+            // 모든 스레드가 끝날 때까지 대기
+            for (Thread thread : threads) {
+                thread.join();
+            }
+
+            //then
+            UserPoint after = userPointTable.selectById(userId);
+
+            System.out.println("성공한 사용 요청: " + successCount.get());
+            System.out.println("실패한 사용 요청: " + failCount.get());
+            System.out.println("실제 최종 포인트: " + after.point());
+            System.out.println("예상: 5개 성공, 5개 실패, 최종 잔액 0원\n");
+
+            // 동시성 문제가 있다면 음수가 되거나, 검증이 제대로 작동하지 않을 것입니다
+            assertThat(after.point()).isGreaterThanOrEqualTo(0L);
+        }
+
+        @Test
+        @DisplayName("동시에 충전과 사용이 발생해도 최종 잔액이 정확해야 한다")
+        public void concurrentChargeAndUse_ShouldBeConsistent() throws Exception {
+            //given
+            long userId = 1L;
+            userPointTable.insertOrUpdate(userId, 50000L);
+            long chargeAmount = 5000L;
+            long useAmount = 3000L;
+            int chargeThreadCount = 5;
+            int useThreadCount = 5;
+
+            long expectedPoint = 50000L + (chargeAmount * chargeThreadCount) - (useAmount * useThreadCount);
+
+            System.out.println("\n=== 동시성 테스트: 충전과 사용 동시 발생 ===");
+            System.out.println("초기 포인트: 50000");
+            System.out.println("충전 스레드 수: " + chargeThreadCount + " (각 " + chargeAmount + "원)");
+            System.out.println("사용 스레드 수: " + useThreadCount + " (각 " + useAmount + "원)");
+            System.out.println("예상 최종 포인트: " + expectedPoint);
+
+            //when
+            Thread[] threads = new Thread[chargeThreadCount + useThreadCount];
+            int threadIndex = 0;
+
+            // 충전 스레드
+            for (int i = 0; i < chargeThreadCount; i++) {
+                threads[threadIndex++] = new Thread(() -> {
+                    pointService.chargePoint(userId, chargeAmount);
+                });
+            }
+
+            // 사용 스레드
+            for (int i = 0; i < useThreadCount; i++) {
+                threads[threadIndex++] = new Thread(() -> {
+                    pointService.usePoint(userId, useAmount);
+                });
+            }
+
+            // 모든 스레드 시작
+            for (Thread thread : threads) {
+                thread.start();
+            }
+
+            // 모든 스레드가 끝날 때까지 대기
+            for (Thread thread : threads) {
+                thread.join();
+            }
+
+            //then
+            UserPoint after = userPointTable.selectById(userId);
+            List<PointHistory> histories = pointHistoryTable.selectAllByUserId(userId);
+
+            long chargeHistoryCount = histories.stream()
+                    .filter(h -> h.type() == TransactionType.CHARGE)
+                    .count();
+            long useHistoryCount = histories.stream()
+                    .filter(h -> h.type() == TransactionType.USE)
+                    .count();
+
+            System.out.println("실제 최종 포인트: " + after.point());
+            System.out.println("충전 히스토리 개수: " + chargeHistoryCount);
+            System.out.println("사용 히스토리 개수: " + useHistoryCount);
+            System.out.println("차이: " + (expectedPoint - after.point()) + " 포인트\n");
+
+            // 동시성 문제가 있다면 이 assertion은 실패할 것입니다
+            assertThat(after.point()).isEqualTo(expectedPoint);
+        }
+    }
+
+    @Nested
     @DisplayName("추가 비즈니스 정책 검증")
     class AdditionalPolicyTest {
 
