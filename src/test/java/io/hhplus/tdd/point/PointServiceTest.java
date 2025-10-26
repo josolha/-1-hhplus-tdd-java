@@ -18,6 +18,7 @@ public class PointServiceTest {
     private PointService pointService;
     private UserPointTable userPointTable;
     private PointHistoryTable pointHistoryTable;
+    private UserLockManager lockManager;
 
     // DB 상태 시각화 헬퍼 메서드
     private void printUserPointTable(String title) {
@@ -58,7 +59,8 @@ public class PointServiceTest {
     void setUp(){
         pointHistoryTable = new PointHistoryTable();
         userPointTable = new UserPointTable();
-        pointService = new PointService(userPointTable, pointHistoryTable);
+        lockManager = new UserLockManager();
+        pointService = new PointService(userPointTable, pointHistoryTable, lockManager);
 
         // 더미 데이터 생성
 

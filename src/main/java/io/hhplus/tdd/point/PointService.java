@@ -3,6 +3,7 @@ package io.hhplus.tdd.point;
 import io.hhplus.tdd.database.PointHistoryTable;
 import io.hhplus.tdd.database.UserPointTable;
 import java.util.List;
+import java.util.concurrent.locks.ReentrantLock;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -10,6 +11,7 @@ public class PointService {
 
     private final UserPointTable userPointTable;
     private final PointHistoryTable pointHistoryTable;
+    private final UserLockManager lockManager;
 
     private static final long POINT_UNIT = 100L;
     private static final long MIN_CHARGE_AMOUNT = 1_000L;
@@ -17,26 +19,51 @@ public class PointService {
     private static final long MAX_USE_AMOUNT = 100_000L;
     private static final long MAX_BALANCE = 10_000_000L;
 
-    public PointService(UserPointTable userPointTable, PointHistoryTable pointHistoryTable) {
+    public PointService(UserPointTable userPointTable, PointHistoryTable pointHistoryTable, UserLockManager lockManager) {
         this.userPointTable = userPointTable;
         this.pointHistoryTable = pointHistoryTable;
+        this.lockManager = lockManager;
     }
 
 
-    public synchronized UserPoint getUserPoint(long userId) {
-        return userPointTable.selectById(userId);
+    public UserPoint getUserPoint(long userId) {
+        ReentrantLock lock = lockManager.getLock(userId);
+        lock.lock();
+        try {
+            return userPointTable.selectById(userId);
+        } finally {
+            lock.unlock();
+        }
     }
 
-    public synchronized List<PointHistory> getUserPointHistory(long userId){
-        return pointHistoryTable.selectAllByUserId(userId);
+    public List<PointHistory> getUserPointHistory(long userId){
+        ReentrantLock lock = lockManager.getLock(userId);
+        lock.lock();
+        try {
+            return pointHistoryTable.selectAllByUserId(userId);
+        } finally {
+            lock.unlock();
+        }
     }
 
-    public synchronized UserPoint chargePoint(long id, long amount){
-        return updatePoint(id, amount, TransactionType.CHARGE);
+    public UserPoint chargePoint(long id, long amount){
+        ReentrantLock lock = lockManager.getLock(id);
+        lock.lock();
+        try {
+            return updatePoint(id, amount, TransactionType.CHARGE);
+        } finally {
+            lock.unlock();
+        }
     }
 
-    public synchronized UserPoint usePoint(long id, long amount){
-        return updatePoint(id, amount, TransactionType.USE);
+    public UserPoint usePoint(long id, long amount){
+        ReentrantLock lock = lockManager.getLock(id);
+        lock.lock();
+        try {
+            return updatePoint(id, amount, TransactionType.USE);
+        } finally {
+            lock.unlock();
+        }
     }
 
     private UserPoint updatePoint(long id, long amount, TransactionType type) {
