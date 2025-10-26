@@ -421,3 +421,7 @@ src/
 - [CLAUDE.md](./CLAUDE.md) - 프로젝트 개발 가이드
 - [Java Concurrency in Practice](https://jcip.net/)
 - [Spring Boot Documentation](https://spring.io/projects/spring-boot)
+
+## 블로그 정리
+- https://josolha.tistory.com/67
+- https://josolha.tistory.com/65
